@@ -1,0 +1,62 @@
+
+#optional
+#install.packages(xlsx)
+#install.packages(tidyverse)
+#install.packages(data.table)
+#setwd()
+
+
+
+# Hadley Wickham, from new zealand, the creator of tidyverse which use very 
+#popular libraries such as data visualization with ggplot, data cleaning dplyr
+#string for string and regular expression manipulation 
+library(tidyverse)
+
+library(data.table)
+database_kyc <- read.csv("RBA_KYC_Accounts_ALL_Ids.csv")
+#to see how the data frame looks like
+head(database_kyc)
+# to see the structure of the dataset 
+str(database_kyc)
+
+#count function to see the problematic data set example
+count(database_kyc, GENDER)
+
+#apply to all columns 
+
+
+
+
+
+#creation date is a character string not date
+
+# major problems
+#we can already using the structure function that there are lot off NULL and
+#NAs in the data set we must able to
+#filtering for NAs to see how many NAs 
+#IMPORTANT NOTE NULLs are in the form of STRINGs 
+
+#drop the columns that are not needed (extraNationality,birthCountry,birthPlace,lastUpdate) legal_Stat_desc
+#score_card_Desc , IsBlackListed
+
+database_dropped <- database_kyc %>% select(-extraNationality,-birthCountry,-lastUpdate,-status,-IsBlackListed,-legal_Stat_desc,-score_card_Desc)
+
+
+
+###########filtering #############
+#delete rows with Nas or Null ()
+#TYPE_OF_DEP remove X
+
+cleaned <- database_dropped %>% filter(extraNationality != 'NULL' )
+
+#inner join 
+#databsed_joined <- Cleaned_database_kyc %>% inner_join()
+
+#pca of the data 
+#pca(Cleaned_database_kyc)
+
+
+#Then, develop one Regression model using rbaValue as target variable.  
+#Remember to assess the model performance using an appropriate measure for regression
+
+#lm(~rbaValue , data = )
