@@ -12,23 +12,34 @@
 #string for string and regular expression manipulation 
 library(tidyverse)
 
-library(data.table)
 database_kyc <- read.csv("RBA_KYC_Accounts_ALL_Ids.csv")
+
+############ Explanatory data analysis  ######################
+
 #to see how the data frame looks like
 head(database_kyc)
-# to see the structure of the dataset 
+# to see the structure of the data set 
 str(database_kyc)
 
+
+
+
+
+#apply to all columns, we can see we have some columns will all NAs
+sapply(database_kyc,function(x) sum(is.na(x)))
+
+#apply count to all functions that are character columns 
 #count function to see the problematic data set example
 count(database_kyc, GENDER)
+count(database_kyc, onboarding)
+count(database_kyc, residentCountry)
+count(database_kyc,nationalityOriginal)
+count(database_kyc,age_in_year)
 
-#apply to all columns 
 
+count(database_kyc,birthCountry) # all NAs
+count()
 
-
-
-
-#creation date is a character string not date
 
 # major problems
 #we can already using the structure function that there are lot off NULL and
@@ -36,27 +47,41 @@ count(database_kyc, GENDER)
 #filtering for NAs to see how many NAs 
 #IMPORTANT NOTE NULLs are in the form of STRINGs 
 
-#drop the columns that are not needed (extraNationality,birthCountry,birthPlace,lastUpdate) legal_Stat_desc
-#score_card_Desc , IsBlackListed
+#drop the columns that are not needed 
+#birthCountry (all NAs),
+#birthPlace (to be checked)
+#lastUpdate(all nulls ) 
+#legal_Stat_desc(all NAs)
+#status (all active )
+#org_code(all are 1 )
+#score_card_Desc(all Nas )
+#IsBlackListed(all values are 0s) 
+#date_of_assingment (everything is 2019-01-24)
+#dateofbirth already has a similar value which is age_in_year)
 
-database_dropped <- database_kyc %>% select(-extraNationality,-birthCountry,-lastUpdate,-status,-IsBlackListed,-legal_Stat_desc,-score_card_Desc)
-
-
+database_dropped <- database_kyc %>% select(-birthCountry,-lastUpdate,-status,
+                                            -IsBlackListed,-legal_Stat_desc,
+                                            -score_card_Desc,-date_of_assingment
+                                            -org_code,-dateofbirth)
 
 ###########filtering #############
 #delete rows with Nas or Null ()
 #TYPE_OF_DEP remove X
+cleaned_database <- database_dropped %>% filter(extraNationality != 'NULL',
+                                       )
 
-cleaned <- database_dropped %>% filter(extraNationality != 'NULL' )
-
-#inner join 
+#left_join
 #databsed_joined <- Cleaned_database_kyc %>% inner_join()
 
 #pca of the data 
 #pca(Cleaned_database_kyc)
 
+############ splitting data set into two parts ###################
+
+
+
 
 #Then, develop one Regression model using rbaValue as target variable.  
 #Remember to assess the model performance using an appropriate measure for regression
 
-#lm(~rbaValue , data = )
+#lm(rbaValue ~ , data = Cleaned_database_kyc )
