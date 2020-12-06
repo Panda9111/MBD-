@@ -11,6 +11,7 @@
 #popular libraries such as data visualization with ggplot, data cleaning dplyr
 #string for string and regular expression manipulation 
 library(tidyverse)
+library(broom)
 
 database_kyc <- read.csv("RBA_KYC_Accounts_ALL_Ids.csv")
 
@@ -21,8 +22,7 @@ head(database_kyc)
 # to see the structure of the data set 
 str(database_kyc)
 
-
-
+#type of dep,gender,company, profession, age_in_year is a character type
 
 
 #apply to all columns, we can see we have some columns will all NAs
@@ -37,15 +37,12 @@ count(database_kyc,nationalityOriginal)
 count(database_kyc,age_in_year)
 
 
-count(database_kyc,birthCountry) # all NAs
-count()
-
-
 # major problems
-#we can already using the structure function that there are lot off NULL and
+#we can already using the structure function that there are lot off NULLs 
+#IMPORTANT NOTE NULLs are in the form of STRINGs 
 #NAs in the data set we must able to
 #filtering for NAs to see how many NAs 
-#IMPORTANT NOTE NULLs are in the form of STRINGs 
+
 
 #drop the columns that are not needed 
 #birthCountry (all NAs),
@@ -61,14 +58,14 @@ count()
 
 database_dropped <- database_kyc %>% select(-birthCountry,-lastUpdate,-status,
                                             -IsBlackListed,-legal_Stat_desc,
-                                            -score_card_Desc,-date_of_assingment
-                                            -org_code,-dateofbirth)
+                                            -score_card_Desc,
+                                            -org_code)
 
 ###########filtering #############
 #delete rows with Nas or Null ()
 #TYPE_OF_DEP remove X
-cleaned_database <- database_dropped %>% filter(extraNationality != 'NULL',
-                                       )
+cleaned_database <- database_dropped %>% filter(extraNationality != 'NULL' )
+                                      
 
 #left_join
 #databsed_joined <- Cleaned_database_kyc %>% inner_join()
@@ -76,12 +73,12 @@ cleaned_database <- database_dropped %>% filter(extraNationality != 'NULL',
 #pca of the data 
 #pca(Cleaned_database_kyc)
 
-############ splitting data set into two parts ###################
-
-
-
 
 #Then, develop one Regression model using rbaValue as target variable.  
 #Remember to assess the model performance using an appropriate measure for regression
 
-#lm(rbaValue ~ , data = Cleaned_database_kyc )
+lm_model <- lm(rbaValue ~ jointAccount + avg_last_10_days + avg_last_30_days, data = cleaned_database )
+summary(lm_model)
+augment(lm_model)
+# proffesor regression model
+#linear_reg() %>% set_engine("lm") %>% fit(hours_per_week ~ education_num + age + gender, data = train)
