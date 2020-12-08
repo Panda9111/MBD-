@@ -135,6 +135,8 @@ count(cleaned_database,TYPE_OF_DEP)
 
 ###########Recoding optional #############
 
+#mutate(gender = factor(gender, levels = c("Male","Female")))
+
 ########now to see the correlation of columns with numeric values#######
 str(cleaned_database)    
 mydata <- cleaned_database %>% select(avg_of_wd_90_days,number_of_wd_90_days,
@@ -194,4 +196,6 @@ mape(lm_model,cleaned_database)
 # proffesor regression model
 #linear_reg() %>% set_engine("lm") %>% fit(hours_per_week ~ education_num + age + gender, data = train)
 
-
+#################logistic regression ###################
+log_model <- glm(rba_grade_desc  ~ ., family=binomial(link='logit'), data= cleaned_database)
+summary(model)
