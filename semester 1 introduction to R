@@ -158,7 +158,7 @@ ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
                        name="Pearson\nCorrelation") +
   theme_minimal()+ # minimal theme
   theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                   size = 5, hjust = 1))+
+                                   size = 7, hjust = 1))+
   coord_fixed()
 # Print the heatmap
 print(ggheatmap)
@@ -179,13 +179,20 @@ ggheatmap +
   guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
                                title.position = "top", title.hjust = 0.5))
 
-
-
+#we can the throw how those highly correlated variables 
+cleaned_database_less_var <- cleaned_database %>% select(-avg_last_30_days,
+                                                         -avg_last_10_days,
+                                                         -avg_cash_deposit_90_days)
+#now we choose the variables we want 
+str(cleaned_database_less_var)
 
 #Then, develop one Regression model using rbaValue as target variable.  
-#Remember to assess the model performance using an appropriate measure for regression
 
-lm_model <- lm(rbaValue ~ jointAccount + avg_last_10_days + avg_last_30_days, data = cleaned_database )
+lm_model <- lm(rbaValue ~ jointAccount + rba_grade_desc + avg_last_90_days+
+                 GENDER + ECO_SEC + avg_of_cash_wd_90_days +
+                 branchCode+ LEGAL_STA_CODE
+                  , data = cleaned_database_less_var )
+
 #to get the summary statistics of the model
 summary(lm_model)
 # to get the more advance details fort he linear model
@@ -197,5 +204,16 @@ mape(lm_model,cleaned_database)
 #linear_reg() %>% set_engine("lm") %>% fit(hours_per_week ~ education_num + age + gender, data = train)
 
 #################logistic regression ###################
-log_model <- glm(rba_grade_desc  ~ ., family=binomial(link='logit'), data= cleaned_database)
-summary(model)
+#converting categorical variables into 1 or 0 
+count(cleaned_database_less_var,rba_grade_desc)
+## recode 
+cleaned_database_log <- cleaned_database_less_var %>% mutate(rba_grade_desc = recode(rba_grade_desc, 
+                         "Low"=0,
+                         "Medium"=1))
+
+
+log_model <- glm(rba_grade_desc ~ jointAccount + rba_grade_desc + avg_last_90_days+
+                   GENDER + ECO_SEC + avg_of_cash_wd_90_days +
+                   branchCode+ LEGAL_STA_CODE, family=binomial(link='logit'), data=cleaned_database_log)
+summary(log_model)
+#anova(log_model, test="Chisq")
