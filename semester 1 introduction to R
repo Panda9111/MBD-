@@ -24,6 +24,7 @@ reorder_cormat <- function(cormat){
 #install.packages(data.table)
 #install.packages(reshape2)
 #install.packages(modelr)
+#install.packages("caret")
 #setwd()
 
 
@@ -37,12 +38,16 @@ library(broom)
 library(reshape2)
 #for model assesment
 library(modelr)
-
+library(caret)
+library(xlsx)
 
 
 database_kyc <- read.csv("RBA_KYC_Accounts_ALL_Ids.csv")
 
-#left join 
+#this used with there is a problem with importing the csv file 
+#database_kyc <- read.csv2("RBA_KYC_Accounts_ALL_Ids.csv",sep = ";")
+
+
 
 
 ############ Explanatory data analysis  ######################
@@ -52,7 +57,13 @@ head(database_kyc)
 # to see the structure of the data set 
 str(database_kyc)
 
-#type of dep,gender,company, profession, age_in_year is a character type
+#type of TYPE_OF_DEP,GENDER,companyType, profession, age_in_year is a character type
+database_kyc$TYPE_OF_DEP <- as.numeric(database_kyc$TYPE_OF_DEP)
+database_kyc$GENDER <- as.numeric(database_kyc$GENDER)
+database_kyc$companyType <- as.numeric(database_kyc$companyType)
+database_kyc$profession <- as.numeric(database_kyc$profession )
+database_kyc$age_in_year <- as.numeric(database_kyc$age_in_year)
+
 
 #apply to all columns, we can see we have some columns will all NAs
 sapply(database_kyc,function(x) sum(is.na(x)))
@@ -67,10 +78,11 @@ database_kyc <- database_kyc %>% select(-score_card_Desc,-birthCountry ,-legal_S
 #NAs in the data set we must able to
 #filtering for NAs to see how many NAs 
 
-
+#turn or NULLs into NAs
 database_kyc[database_kyc == "NULL"] <- NA
 
 sapply(database_kyc,function(x) sum(is.na(x)))
+
 
 ####apply count to all functions that are character columns  ### 
 #count function to see the problematic data set example ,
@@ -130,6 +142,8 @@ str(database_dropped)
 ####remove all NAs #  (to be discussed by group )
 cleaned_database <- na.omit(database_dropped)
 
+
+#to see if the x in the TYPE_OF_DEP was removed
 count(cleaned_database,TYPE_OF_DEP)
 
 
@@ -183,23 +197,62 @@ ggheatmap +
 cleaned_database_less_var <- cleaned_database %>% select(-avg_last_30_days,
                                                          -avg_last_10_days,
                                                          -avg_cash_deposit_90_days)
+
+
+### other databases  for left_join 
+database_Profession <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 1 ) %>% select(-Description)
+database_Ledgers <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 3 ) %>% select(-dsc)
+database_Eco_sec <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 5 ) %>% select(-dsc)
+database_Type_Dep<- read.xlsx("RBA Metadata.xlsx",sheetIndex = 6 ) %>% select(-dsc)
+database_legal_sta_code <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 7 ) %>% select(-dsc)
+database_countries <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 8 ) %>% select(-dsc)
+database_Currencies <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 9 ) %>% select(-dsc)
+
+database_kyc$TYPE_OF_DEP <- as.numeric(database_kyc$TYPE_OF_DEP)
+database_kyc$GENDER <- as.numeric(database_kyc$GENDER)
+database_kyc$companyType <- as.numeric(database_kyc$companyType)
+database_kyc$age_in_year <- as.numeric(database_kyc$age_in_year)
+database_Profession$Value <- as.numeric(database_Profession$Value)
+
+cleaned_database_less_var <- cleaned_database_less_var %>% left_join(database_Profession, by = c('profession'= 'Value')) %>%
+                                            left_join(database_Ledgers, by = c('ledgerCode'= 'value')) %>%
+                                            left_join(database_Eco_sec, by = c('ECO_SEC'= 'value')) %>%
+                                            left_join(database_Type_Dep, by = c('TYPE_OF_DEP'= 'value')) %>%
+                                            left_join(database_legal_sta_code, by = c('LEGAL_STA_CODE'= 'value')) %>%
+                                            left_join(database_countries, by = c('nationalityOriginal'= 'value')) %>%
+                                            left_join(database_Currencies, by = c('accountCurrency'= 'value'))
+                                        
+                                            
+  
+
+
 #now we choose the variables we want 
 str(cleaned_database_less_var)
 
-#Then, develop one Regression model using rbaValue as target variable.  
+
+
+#Then, develop one Regression model using rbaValue as target variable. 
+
+####add creation date change into as.date()
 
 lm_model <- lm(rbaValue ~ jointAccount + rba_grade_desc + avg_last_90_days+
                  GENDER + ECO_SEC + avg_of_cash_wd_90_days +
-                 branchCode+ LEGAL_STA_CODE
-                  , data = cleaned_database_less_var )
+                 branchCode+ LEGAL_STA_CODE +as.Date(creationDate)
+               ,data = cleaned_database_less_var )
 
 #to get the summary statistics of the model
 summary(lm_model)
 # to get the more advance details fort he linear model
 augment(lm_model)
 #RMSE and mape 
-rmse(lm_model,cleaned_database)
-mape(lm_model,cleaned_database)
+rmse(lm_model,cleaned_database_less_var)
+mape(lm_model,cleaned_database_less_var)
+mae(lm_model,cleaned_database_less_var)
+#delete some useless variables
+#here we are deleting variables with h p values
+
+
+
 # proffesor regression model
 #linear_reg() %>% set_engine("lm") %>% fit(hours_per_week ~ education_num + age + gender, data = train)
 
@@ -207,13 +260,127 @@ mape(lm_model,cleaned_database)
 #converting categorical variables into 1 or 0 
 count(cleaned_database_less_var,rba_grade_desc)
 ## recode 
-cleaned_database_log <- cleaned_database_less_var %>% mutate(rba_grade_desc = recode(rba_grade_desc, 
-                         "Low"=0,
-                         "Medium"=1))
+#cleaned_database_log <- cleaned_database_less_var %>% mutate(rba_grade_desc = recode(rba_grade_desc, 
+#                                                                                     "Low"=0,
+#                                                                                     "Medium"=1))
+
+set.seed(3456)
+trainIndex <- createDataPartition(cleaned_database_less_var$rba_grade_desc, p = .8,
+                                  list = FALSE,
+                                  times = 1)
+Train <- cleaned_database_less_var[trainIndex,]
+Test <- cleaned_database_less_var[-trainIndex,]
 
 
-log_model <- glm(rba_grade_desc ~ jointAccount + rba_grade_desc + avg_last_90_days+
-                   GENDER + ECO_SEC + avg_of_cash_wd_90_days +
-                   branchCode+ LEGAL_STA_CODE, family=binomial(link='logit'), data=cleaned_database_log)
+count(Train,rba_grade_desc)
+## recode 
+cleaned_database_log_Train <- Train %>% mutate(rba_grade_desc = recode(rba_grade_desc, 
+                                                                       "Low"=0,
+                                                                       "Medium"=1))
+cleaned_database_log_Test<- Test %>% mutate(rba_grade_desc = recode(rba_grade_desc, 
+                                                                    "Low"=0,
+                                                                    "Medium"=1))
+cleaned_database_log_Train <- Train %>% mutate(score_card = recode(score_card, 
+                                                                   "E-Existing"=0,
+                                                                   "E-NEW"=1,
+                                                                   "I-Existing"=2,
+                                                                   "I-New"=3))
+cleaned_database_log_Test <- Test %>% mutate(score_card = recode(score_card, 
+                                                                 "E-Existing"=0,
+                                                                 "E-NEW"=1,
+                                                                 "I-Existing"=2,
+                                                                 "I-New"=3))
+
+
+
+
+#changing the to be predicted value to factor
+cleaned_database_log_Train$rba_grade_desc<-as.factor(cleaned_database_log_Train$rba_grade_desc)
+#changing the to be predicted value to factor
+cleaned_database_log_Test$rba_grade_desc<-as.factor(cleaned_database_log_Test$rba_grade_desc)
+
+class(cleaned_database_log_Train$rba_grade_desc)
+class(cleaned_database_log_Test$rba_grade_desc)
+
+log_model <- glm(rba_grade_desc ~ jointAccount + avg_last_90_days+ score_card+
+                   GENDER + avg_of_cash_wd_90_days +
+                   branchCode+ LEGAL_STA_CODE, family=binomial(link='logit'), data=cleaned_database_log_Train)
 summary(log_model)
-#anova(log_model, test="Chisq")
+anova(log_model, test="Chisq")
+
+#predicting the model on the test set
+fitted_results <- predict(log_model,cleaned_database_log_Test,type='response')
+hist(fitted_results)
+fitted_results <- ifelse(fitted_results > 0.1,1,0)
+plot(fitted_results)
+
+#Creating confusion Matrix
+table_mat <- table(cleaned_database_log_Test$rba_grade_desc, fitted_results > 0.1)
+table_mat
+
+#Calculate Accuracy
+accuracyTest = sum(diag(table_mat)) / sum(table_mat)
+accuracyTest
+
+#calculate Precision
+precision <- function(matrix) {
+  # True positive
+  tp <- matrix[2, 2]
+  # False positive
+  fp <- matrix[1, 2]
+  return (tp/(tp+fp))
+}
+
+prec = precision(table_mat)
+prec
+
+#calculate Recall
+recall <- function(matrix) {
+  # true positive
+  tp <- matrix[2, 2]
+  # false positive
+  fn <- matrix[2, 1]
+  return (tp/(tp+fn))
+}
+
+rec = recall(table_mat)
+rec
+
+#Calculate Specificity
+specifity <- function(matrix) {
+  # true positive
+  tn <- matrix[1, 1]
+  # false positive
+  fp <- matrix[1, 2]
+  return (tn/(tn+fp))
+}
+
+spe = specifity(table_mat)
+spe
+
+#Calculate F1 Score
+y_pred <- fitted_results
+class(y_pred)
+cleaned_database_log_Test<- Test %>% mutate(rba_grade_desc = recode(rba_grade_desc, 
+                                                                    "Low"=0,
+                                                                    "Medium"=1))
+y_true <- cleaned_database_log_Test$rba_grade_desc
+class(y_true)
+library(MLmetrics)
+F1_Score(y_true, y_pred, positive = NULL)
+
+
+#ROC Curve
+p  <- predict(log_model,cleaned_database_log_Train,type='response')
+library(ROCR)
+pr <- prediction(p, cleaned_database_log_Train$rba_grade_desc)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+#AOC
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+
+
+
