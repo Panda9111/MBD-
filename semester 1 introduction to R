@@ -1,8 +1,29 @@
+##functions 
+# Get lower triangle of the correlation matrix
+get_lower_tri<-function(cormat){
+  cormat[upper.tri(cormat)] <- NA
+  return(cormat)
+}
+# Get upper triangle of the correlation matrix
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  return(cormat)
+}
+
+reorder_cormat <- function(cormat){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-cormat)/2)
+  hc <- hclust(dd)
+  cormat <-cormat[hc$order, hc$order]
+}
+
 
 #optional
 #install.packages(xlsx)
 #install.packages(tidyverse)
 #install.packages(data.table)
+#install.packages(reshape2)
+#install.packages(modelr)
 #setwd()
 
 
@@ -12,8 +33,17 @@
 #string for string and regular expression manipulation 
 library(tidyverse)
 library(broom)
+#for visualization of correlation 
+library(reshape2)
+#for model assesment
+library(modelr)
+
+
 
 database_kyc <- read.csv("RBA_KYC_Accounts_ALL_Ids.csv")
+
+#left join 
+
 
 ############ Explanatory data analysis  ######################
 
@@ -24,19 +54,13 @@ str(database_kyc)
 
 #type of dep,gender,company, profession, age_in_year is a character type
 
-
 #apply to all columns, we can see we have some columns will all NAs
 sapply(database_kyc,function(x) sum(is.na(x)))
 
-#apply count to all functions that are character columns 
-#count function to see the problematic data set example
-count(database_kyc, GENDER)
-count(database_kyc, onboarding)
-count(database_kyc, residentCountry)
-count(database_kyc,nationalityOriginal)
-count(database_kyc,age_in_year)
+#we can drop the following columns :  score_card_Desc,birthCountry ,legal_Stat_desc 
+database_kyc <- database_kyc %>% select(-score_card_Desc,-birthCountry ,-legal_Stat_desc )
 
-
+#we noticed that there were a lot of NULLs as string we can convert them in to NAs
 # major problems
 #we can already using the structure function that there are lot off NULLs 
 #IMPORTANT NOTE NULLs are in the form of STRINGs 
@@ -44,41 +68,130 @@ count(database_kyc,age_in_year)
 #filtering for NAs to see how many NAs 
 
 
+database_kyc[database_kyc == "NULL"] <- NA
+
+sapply(database_kyc,function(x) sum(is.na(x)))
+
+####apply count to all functions that are character columns  ### 
+#count function to see the problematic data set example ,
+#make a function lol
+
+count(database_kyc,org_code) # remove all columns are the same
+count(database_kyc,branchCode)
+count(database_kyc,customerType)
+count(database_kyc, onboarding)
+count(database_kyc, residentStatus)
+count(database_kyc, residentCountry) # residentCountry a lot of NA
+count(database_kyc,nationalityOriginal) #nationalityOriginal 3439
+count(database_kyc,extraNationality) #extraNationality <NA> 223075
+count(database_kyc,age_in_year) #age_in_year  417 NA the same as dateOfBirth (remove col)
+count(database_kyc,birthPlace) #birthPlace  too many error delete column 
+count(database_kyc, profession) #profession NA 145120
+count(database_kyc, companyType) # companyType NA 110294
+count(database_kyc, giinCode) #giinCOde remove column
+count(database_kyc,lastUpdate) #lastUpdate  ### remove the column 
+count(database_kyc,status) #status  ##all items are the same 
+count(database_kyc,ledgerCode)
+count(database_kyc,accountCurrency)
+count(database_kyc,IsBlackListed) #IsBlackListed remove table all the same values 
+count(database_kyc,CUS_CLASS)
+count(database_kyc,ECO_SEC)
+count(database_kyc,TYPE_OF_DEP) #TYPE_OF_DEP remove the x 
+count(database_kyc, GENDER) #GENDER <NA> 120511 
+count(database_kyc,LEGAL_STA_CODE) ## remove the  <NA>   2616
+#date_of_assessment not sure 
+count(database_kyc,rbaGradeAbrv) # rba_grade_desc and rbaGradeAbrv the same 
+count(database_kyc,rba_grade_desc)
+count(database_kyc,score_card)
+
+#for users to visualize the columns , change x and fill
+ggplot(database_kyc,aes(x=GENDER, fill = GENDER)) +
+  stat_count(width = 0.5) +
+  theme_classic()
+
 #drop the columns that are not needed 
+#org_code(all are 1 )
 #birthCountry (all NAs),
 #birthPlace (to be checked)
 #lastUpdate(all nulls ) 
 #legal_Stat_desc(all NAs)
-#status (all active )
-#org_code(all are 1 )
 #score_card_Desc(all Nas )
 #IsBlackListed(all values are 0s) 
 #date_of_assingment (everything is 2019-01-24)
 #dateofbirth already has a similar value which is age_in_year)
 
-database_dropped <- database_kyc %>% select(-birthCountry,-lastUpdate,-status,
-                                            -IsBlackListed,-legal_Stat_desc,
-                                            -score_card_Desc,
-                                            -org_code)
+database_dropped <- database_kyc %>% select(-org_code,-residentCountry,
+                                            -`extraNationality`,-dateOfBirth,
+                                            -birthPlace,-giinCode,
+                                            -lastUpdate,-status,
+                                            -IsBlackListed,-rbaGradeAbrv,-date_of_assessment)
+str(database_dropped)
 
-###########filtering #############
-#delete rows with Nas or Null ()
-#TYPE_OF_DEP remove X
-cleaned_database <- database_dropped %>% filter(extraNationality != 'NULL' )
-                                      
+####remove all NAs #  (to be discussed by group )
+cleaned_database <- na.omit(database_dropped)
 
-#left_join
-#databsed_joined <- Cleaned_database_kyc %>% inner_join()
+count(cleaned_database,TYPE_OF_DEP)
 
-#pca of the data 
-#pca(Cleaned_database_kyc)
+
+###########Recoding optional #############
+
+########now to see the correlation of columns with numeric values#######
+str(cleaned_database)    
+mydata <- cleaned_database %>% select(avg_of_wd_90_days,number_of_wd_90_days,
+                                      avg_of_cash_wd_90_days,number_of_cash_wd_90_days,
+                                      avg_of_dep_90_days,number_of_deposit_90_days,avg_cash_deposit_90_days,
+                                      number_of_cash_dep_90_days,avg_last_90_days,avg_last_30_days,avg_last_10_days)
+
+cormat <- round(cor(mydata),2)
+#reshapes the data
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
+# Melt the correlation matrix
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+# Create a ggheatmap
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 5, hjust = 1))+
+  coord_fixed()
+# Print the heatmap
+print(ggheatmap)
+
+# we want to see the correlated assets
+ggheatmap + 
+  geom_text(aes(Var2, Var1, label = value), color = "black", size = 2) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.justification = c(1, 0),
+    legend.position = c(0.6, 0.7),
+    legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+
+
 
 
 #Then, develop one Regression model using rbaValue as target variable.  
 #Remember to assess the model performance using an appropriate measure for regression
 
 lm_model <- lm(rbaValue ~ jointAccount + avg_last_10_days + avg_last_30_days, data = cleaned_database )
+#to get the summary statistics of the model
 summary(lm_model)
+# to get the more advance details fort he linear model
 augment(lm_model)
+#RMSE and mape 
+rmse(lm_model,cleaned_database)
+mape(lm_model,cleaned_database)
 # proffesor regression model
 #linear_reg() %>% set_engine("lm") %>% fit(hours_per_week ~ education_num + age + gender, data = train)
+
+
