@@ -33,6 +33,7 @@ reorder_cormat <- function(cormat){
 #popular libraries such as data visualization with ggplot, data cleaning dplyr
 #string for string and regular expression manipulation 
 library(tidyverse)
+#for tidying models
 library(broom)
 #for visualization of correlation 
 library(reshape2)
@@ -199,6 +200,8 @@ database_legal_sta_code <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 7 ) %>% se
 database_countries <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 8 ) %>% select(-dsc)
 database_Currencies <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 9 ) %>% select(-dsc)
 
+
+str(database_Profession)
 #To be  able to join the columns since the original data set has charter values 
 cleaned_database_less_var$TYPE_OF_DEP <- as.numeric(cleaned_database_less_var$TYPE_OF_DEP)
 cleaned_database_less_var$GENDER <- as.numeric(cleaned_database_less_var$GENDER)
@@ -257,6 +260,11 @@ lm_model_new <- lm(rbaValue ~ jointAccount + rba_grade_desc +
 
 
 str(lm_model_new)
+augment(lm_model_new)
+#RMSE and mape 
+rmse(lm_model_new,cleaned_database_less_var)
+mape(lm_model_new,cleaned_database_less_var)
+mae(lm_model_new,cleaned_database_less_var)
 
 #################logistic regression ###################
 #converting categorical variables into 1 or 0 
