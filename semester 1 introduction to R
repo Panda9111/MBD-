@@ -36,7 +36,7 @@ library(tidyverse)
 library(broom)
 #for visualization of correlation 
 library(reshape2)
-#for model assesment
+#for model assessment
 library(modelr)
 library(caret)
 library(xlsx)
@@ -58,11 +58,6 @@ head(database_kyc)
 str(database_kyc)
 
 #type of TYPE_OF_DEP,GENDER,companyType, profession, age_in_year is a character type
-database_kyc$TYPE_OF_DEP <- as.numeric(database_kyc$TYPE_OF_DEP)
-database_kyc$GENDER <- as.numeric(database_kyc$GENDER)
-database_kyc$companyType <- as.numeric(database_kyc$companyType)
-database_kyc$profession <- as.numeric(database_kyc$profession )
-database_kyc$age_in_year <- as.numeric(database_kyc$age_in_year)
 
 
 #apply to all columns, we can see we have some columns will all NAs
@@ -71,16 +66,15 @@ sapply(database_kyc,function(x) sum(is.na(x)))
 #we can drop the following columns :  score_card_Desc,birthCountry ,legal_Stat_desc 
 database_kyc <- database_kyc %>% select(-score_card_Desc,-birthCountry ,-legal_Stat_desc )
 
-#we noticed that there were a lot of NULLs as string we can convert them in to NAs
 # major problems
-#we can already using the structure function that there are lot off NULLs 
-#IMPORTANT NOTE NULLs are in the form of STRINGs 
-#NAs in the data set we must able to
-#filtering for NAs to see how many NAs 
+#we noticed that there were a lot of NULLs as string  using the str() function
+#we can convert them in to NAs
 
 #turn or NULLs into NAs
 database_kyc[database_kyc == "NULL"] <- NA
 
+
+#To determine which columns have Missing values / Nas
 sapply(database_kyc,function(x) sum(is.na(x)))
 
 
@@ -116,10 +110,7 @@ count(database_kyc,rbaGradeAbrv) # rba_grade_desc and rbaGradeAbrv the same
 count(database_kyc,rba_grade_desc)
 count(database_kyc,score_card)
 
-#for users to visualize the columns , change x and fill
-ggplot(database_kyc,aes(x=GENDER, fill = GENDER)) +
-  stat_count(width = 0.5) +
-  theme_classic()
+
 
 #drop the columns that are not needed 
 #org_code(all are 1 )
@@ -146,10 +137,10 @@ cleaned_database <- na.omit(database_dropped)
 #to see if the x in the TYPE_OF_DEP was removed
 count(cleaned_database,TYPE_OF_DEP)
 
-
-###########Recoding optional #############
-
-#mutate(gender = factor(gender, levels = c("Male","Female")))
+#for users to visualize the columns , change x and fill
+ggplot(database_kyc,aes(x=GENDER, fill = GENDER)) +
+  stat_count(width = 0.5) +
+  theme_classic()
 
 ########now to see the correlation of columns with numeric values#######
 str(cleaned_database)    
@@ -208,12 +199,14 @@ database_legal_sta_code <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 7 ) %>% se
 database_countries <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 8 ) %>% select(-dsc)
 database_Currencies <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 9 ) %>% select(-dsc)
 
-database_kyc$TYPE_OF_DEP <- as.numeric(database_kyc$TYPE_OF_DEP)
-database_kyc$GENDER <- as.numeric(database_kyc$GENDER)
-database_kyc$companyType <- as.numeric(database_kyc$companyType)
-database_kyc$age_in_year <- as.numeric(database_kyc$age_in_year)
-database_Profession$Value <- as.numeric(database_Profession$Value)
+#To be  able to join the columns since the original data set has charter values 
+cleaned_database_less_var$TYPE_OF_DEP <- as.numeric(cleaned_database_less_var$TYPE_OF_DEP)
+cleaned_database_less_var$GENDER <- as.numeric(cleaned_database_less_var$GENDER)
+cleaned_database_less_var$companyType <- as.numeric(cleaned_database_less_var$companyType)
+cleaned_database_less_var$age_in_year <- as.numeric(cleaned_database_less_var$age_in_year)
+cleaned_database_less_var$LEGAL_STA_CODE <- as.numeric(cleaned_database_less_var$LEGAL_STA_CODE)
 
+#connecting the database using a left join 
 cleaned_database_less_var <- cleaned_database_less_var %>% left_join(database_Profession, by = c('profession'= 'Value')) %>%
                                             left_join(database_Ledgers, by = c('ledgerCode'= 'value')) %>%
                                             left_join(database_Eco_sec, by = c('ECO_SEC'= 'value')) %>%
@@ -223,21 +216,27 @@ cleaned_database_less_var <- cleaned_database_less_var %>% left_join(database_Pr
                                             left_join(database_Currencies, by = c('accountCurrency'= 'value'))
                                         
                                             
-  
+#check if there were NAs created with the left join
+sapply(cleaned_database_less_var,function(x) sum(is.na(x)))
 
 
 #now we choose the variables we want 
 str(cleaned_database_less_var)
 
 
+#rename the additional columns 
+
+cleaned_database_less_var <- rename(cleaned_database_less_var, code_prof = Code ,
+                                    code_ledger = code.x  ,code_eco_sec= code.y ,
+                                    code_dept = code.x.x  , code_legal = code.y.y )
 
 #Then, develop one Regression model using rbaValue as target variable. 
 
 ####add creation date change into as.date()
 
 lm_model <- lm(rbaValue ~ jointAccount + rba_grade_desc + avg_last_90_days+
-                 GENDER + ECO_SEC + avg_of_cash_wd_90_days +
-                 branchCode+ LEGAL_STA_CODE +as.Date(creationDate)
+                 GENDER + code_eco_sec + avg_of_cash_wd_90_days +
+                 branchCode+ code_legal +as.Date(creationDate)
                ,data = cleaned_database_less_var )
 
 #to get the summary statistics of the model
@@ -249,20 +248,20 @@ rmse(lm_model,cleaned_database_less_var)
 mape(lm_model,cleaned_database_less_var)
 mae(lm_model,cleaned_database_less_var)
 #delete some useless variables
-#here we are deleting variables with h p values
+#here we are deleting variables with high  p values, removing avg_last_90_days
+
+lm_model_new <- lm(rbaValue ~ jointAccount + rba_grade_desc + 
+                 GENDER + code_eco_sec + avg_of_cash_wd_90_days +
+                 branchCode+ code_legal +as.Date(creationDate)
+               ,data = cleaned_database_less_var )
 
 
-
-# proffesor regression model
-#linear_reg() %>% set_engine("lm") %>% fit(hours_per_week ~ education_num + age + gender, data = train)
+str(lm_model_new)
 
 #################logistic regression ###################
 #converting categorical variables into 1 or 0 
 count(cleaned_database_less_var,rba_grade_desc)
 ## recode 
-#cleaned_database_log <- cleaned_database_less_var %>% mutate(rba_grade_desc = recode(rba_grade_desc, 
-#                                                                                     "Low"=0,
-#                                                                                     "Medium"=1))
 
 set.seed(3456)
 trainIndex <- createDataPartition(cleaned_database_less_var$rba_grade_desc, p = .8,
