@@ -1,21 +1,3 @@
-##functions 
-# Get lower triangle of the correlation matrix
-get_lower_tri<-function(cormat){
-  cormat[upper.tri(cormat)] <- NA
-  return(cormat)
-}
-# Get upper triangle of the correlation matrix
-get_upper_tri <- function(cormat){
-  cormat[lower.tri(cormat)]<- NA
-  return(cormat)
-}
-
-reorder_cormat <- function(cormat){
-  # Use correlation between variables as distance
-  dd <- as.dist((1-cormat)/2)
-  hc <- hclust(dd)
-  cormat <-cormat[hc$order, hc$order]
-}
 
 
 #optional
@@ -45,8 +27,8 @@ library(xlsx)
 
 database_kyc <- read.csv("RBA_KYC_Accounts_ALL_Ids.csv")
 
-#this used with there is a problem with importing the csv file 
-#database_kyc <- read.csv2("RBA_KYC_Accounts_ALL_Ids.csv",sep = ";")
+#this used with there is a problem with importing the csv file for european
+#database_kyc <- read.csv("RBA_KYC_Accounts_ALL_Ids.csv",sep = ";")
 
 
 
@@ -83,7 +65,7 @@ sapply(database_kyc,function(x) sum(is.na(x)))
 #count function to see the problematic data set example ,
 #make a function lol
 
-count(database_kyc,org_code) # remove all columns are the same
+count(database_kyc,org_code) # remove  column are the same
 count(database_kyc,branchCode)
 count(database_kyc,customerType)
 count(database_kyc, onboarding)
@@ -139,12 +121,33 @@ cleaned_database <- na.omit(database_dropped)
 count(cleaned_database,TYPE_OF_DEP)
 
 #for users to visualize the columns , change x and fill
-ggplot(database_kyc,aes(x=GENDER, fill = GENDER)) +
+ggplot(cleaned_database,aes(x=GENDER, fill = GENDER)) +
   stat_count(width = 0.5) +
   theme_classic()
 
 ########now to see the correlation of columns with numeric values#######
-str(cleaned_database)    
+str(cleaned_database) 
+
+##functions 
+# Get lower triangle of the correlation matrix
+get_lower_tri<-function(cormat){
+  cormat[upper.tri(cormat)] <- NA
+  return(cormat)
+}
+# Get upper triangle of the correlation matrix
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  return(cormat)
+}
+
+reorder_cormat <- function(cormat){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-cormat)/2)
+  hc <- hclust(dd)
+  cormat <-cormat[hc$order, hc$order]
+}
+
+#choose those columns that have integer values in order to find out correlation
 mydata <- cleaned_database %>% select(avg_of_wd_90_days,number_of_wd_90_days,
                                       avg_of_cash_wd_90_days,number_of_cash_wd_90_days,
                                       avg_of_dep_90_days,number_of_deposit_90_days,avg_cash_deposit_90_days,
@@ -191,7 +194,7 @@ cleaned_database_less_var <- cleaned_database %>% select(-avg_last_30_days,
                                                          -avg_cash_deposit_90_days)
 
 
-### other databases  for left_join 
+### other databases  to left_join with current database
 database_Profession <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 1 ) %>% select(-Description)
 database_Ledgers <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 3 ) %>% select(-dsc)
 database_Eco_sec <- read.xlsx("RBA Metadata.xlsx",sheetIndex = 5 ) %>% select(-dsc)
@@ -384,7 +387,7 @@ pr <- prediction(p, cleaned_database_log_Train$rba_grade_desc)
 prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 plot(prf)
 
-#AOC
+#AUC
 auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
